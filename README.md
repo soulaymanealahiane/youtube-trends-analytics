@@ -42,8 +42,8 @@ The raw dataset from Kaggle contained heavy unstructured text fields that caused
 │   ├── extract_unique_countries_arr.py  # Pipeline Step 2: Regex geospatial extraction
 │   └── stats_columns_addition.py        # Pipeline Step 3: Feature engineering & Outliers
 ├── dashboards/
-│   ├── dashboard_1_geography.png        # Language & Geographic Demand Tableau Dashboard-- to download
-│   └── dashboard_2_engagement.png       # Engagement & Momentum Tableau Dashboard-- to download
+│   ├── engagement performance & momentum analytics.twbx       # Language & Geographic Demand Tableau Dashboard-- to download
+│   └── global views and language dominance analytics.twbx     # Engagement & Momentum Tableau Dashboard-- to download
 ├── docs/
 │   └── presentation_lastdraft.html      # Interactive HTML Presentation Deck with business recommendations
 └── README.md
