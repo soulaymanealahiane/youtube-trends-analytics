@@ -1,0 +1,992 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Global YouTube Trends Analytics</title>
+    <style>
+        :root {
+            /* Professional Dark Theme */
+            --primary: #3b82f6;       /* Blue */
+            --secondary: #0f172a;     /* Deep Navy */
+            --accent: #f59e0b;        /* Amber */
+            --success: #10b981;       /* Green */
+            --danger: #ef4444;        /* Red */
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --bg-gradient: radial-gradient(circle at top right, #1e293b, #020617);
+            --code-bg: #111827;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background: var(--bg-gradient);
+            color: var(--text-main);
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
+        }
+
+        /* --- SLIDE ARCHITECTURE --- */
+        .deck { position: relative; height: 100%; width: 100%; }
+
+        .slide {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            padding: 5rem 5rem 3rem 5rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.4s ease-in-out;
+            z-index: 1;
+        }
+
+        .slide.active {
+            opacity: 1;
+            visibility: visible;
+            z-index: 2;
+        }
+
+        /* --- TYPOGRAPHY --- */
+        h1 {
+            font-size: 3.5rem; font-weight: 800; margin-bottom: 1rem;
+            background: linear-gradient(135deg, #60a5fa 0%, #a78bfa 100%);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        }
+
+        h2 {
+            font-size: 2.2rem; color: var(--accent); margin-bottom: 2rem;
+            border-left: 5px solid var(--primary); padding-left: 1rem;
+        }
+
+        h3 { font-size: 1.4rem; color: var(--text-main); margin-bottom: 1rem; font-weight: 600; }
+        p, li { font-size: 1.1rem; line-height: 1.6; color: var(--text-muted); margin-bottom: 0.8rem; }
+        ul { list-style: none; }
+        li { padding-left: 1.5rem; position: relative; }
+        li::before { content: "•"; color: var(--primary); position: absolute; left: 0; font-weight: bold; }
+
+        /* --- LAYOUTS --- */
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 4rem; align-items: center; height: 100%; }
+        
+        /* --- COMPONENTS --- */
+        .card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px; padding: 2rem;
+            backdrop-filter: blur(10px);
+        }
+
+        /* --- DATA TABLES --- */
+        .table-container {
+            width: 100%;
+            overflow-x: auto;
+            background: #000;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            padding: 1rem;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.75rem;
+            font-family: 'Consolas', monospace;
+            white-space: nowrap;
+        }
+
+        th {
+            text-align: left;
+            padding: 12px 8px;
+            background: #1e293b;
+            color: var(--accent);
+            border-bottom: 2px solid #475569;
+            position: sticky;
+            top: 0;
+        }
+
+        td {
+            padding: 8px;
+            border-bottom: 1px solid #333;
+            color: #cbd5e1;
+            max-width: 200px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        tr:nth-child(even) { background: rgba(255,255,255,0.03); }
+
+        .cell-long-text {
+            color: #94a3b8;
+            font-style: italic;
+        }
+
+        /* --- CODE BLOCKS --- */
+        pre {
+            background: var(--code-bg); padding: 1.5rem; border-radius: 8px;
+            overflow: auto; max-height: 60vh;
+            border-left: 4px solid var(--accent);
+            font-family: 'Fira Code', 'Consolas', monospace;
+            font-size: 0.9rem; color: #e2e8f0;
+        }
+        
+        .code-header {
+            background: #1f2937; color: #9ca3af; padding: 0.5rem 1rem;
+            font-family: monospace; font-size: 0.8rem; border-radius: 8px 8px 0 0;
+            border-bottom: 1px solid #374151;
+        }
+
+        /* --- TRANSITION SLIDES --- */
+        .transition-container {
+            text-align: center;
+            border-top: 1px solid rgba(255,255,255,0.1);
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            padding: 4rem 0;
+            margin: 0 auto;
+            max-width: 80%;
+        }
+        
+        .transition-label {
+            color: var(--accent);
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            font-size: 0.9rem;
+            margin-bottom: 1rem;
+            font-weight: 600;
+        }
+
+        .transition-title {
+            font-size: 3.2rem;
+            font-weight: 300;
+            color: var(--text-main);
+            background: transparent;
+            -webkit-text-fill-color: unset;
+            margin-bottom: 0;
+            line-height: 1.3;
+        }
+
+        /* --- NAVIGATION --- */
+        .controls { 
+            position: fixed; 
+            bottom: 2rem; 
+            right: 2rem; 
+            z-index: 9999; 
+            display: flex; 
+            gap: 1rem; 
+        }
+        .btn {
+            background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white; padding: 0.8rem 1.5rem; border-radius: 4px; cursor: pointer; transition: all 0.2s;
+            font-weight: bold;
+            user-select: none;
+        }
+        .btn:hover { background: var(--primary); }
+        .btn:active { transform: scale(0.95); }
+        .progress-bar { position: fixed; bottom: 0; left: 0; height: 5px; background: var(--accent); width: 0%; z-index: 20; transition: width 0.3s; }
+    </style>
+</head>
+<body>
+
+    <div class="progress-bar" id="progress"></div>
+
+    <div class="deck">
+
+        <!-- 1. Title Slide (You) -->
+        <div class="slide active">
+            <div style="text-align: center;">
+                <p style="color: var(--text-muted); letter-spacing: 2px; text-transform: uppercase; margin-bottom: 1rem;">BAI 3301 Mid-Semester Project</p>
+                <h1>Global YouTube Trends Analytics</h1>
+                <h2 style="border:none; color: var(--text-main); font-size: 1.8rem; margin-top: 1rem;">Digital Platform Performance Insights</h2>
+                
+                <div style="margin-top: 4rem; color: var(--text-muted); font-size: 1.1rem;">
+                    <p>Presented by <strong>White Mountain Analysts</strong></p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. Project Overview -->
+        <div class="slide">
+            <h2>Project Overview</h2>
+            <div class="grid-2">
+                <div>
+                    <h3>Objective</h3>
+                    <p>We were hired as digital analytics consultants to analyze digital platform data (YouTube) to understand user behavior and performance trends.</p>
+                    
+                    <h3 style="margin-top: 2rem;">Deliverables</h3>
+                    <ul>
+                        <li>Interactive Tableau Dashboard</li>
+                        <li>Presentation</li>
+                    </ul>
+                </div>
+                <div class="card">
+                    <h3>Focus Area</h3>
+                    <p><strong>Global YouTube Video Statistics</strong></p>
+                    <p>We aim to understand the relationship between <strong>Virality</strong> (High Views) and <strong>Consistent Engagement</strong> (Likes/Comments).</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. Dataset Choice -->
+        <div class="slide">
+            <h2>Task 1: Dataset Selection</h2>
+            <div class="grid-2">
+                <div>
+                    <h3>Identity</h3>
+                    <ul>
+                        <li><strong>Name:</strong> Global YouTube Video Statistics</li>
+                        <li><strong>Source:</strong> Kaggle Open Data Repositories</li>
+                        <li><strong>Volume:</strong> ~1,000,000 rows (Original: ~5GB)</li>
+                    </ul>
+                    <h3 style="margin-top: 2rem;">Justification</h3>
+                    <p>Selected for its <strong>Granularity</strong> (Daily movements) and <strong>Geospatial</strong> breadth (Country codes), allowing for deep performance analysis rather than just lifetime totals.</p>
+                </div>
+                <div class="card" style="display: flex; justify-content: center; align-items: center; background: white;">
+                    <img src="https://upload.wikimedia.org/wikipedia/commons/7/7c/Kaggle_logo.png" alt="Kaggle Logo" style="width: 200px;">
+                </div>
+            </div>
+        </div>
+
+        <!-- 4. Raw Data Part 1 -->
+        <div class="slide">
+            <h2>The Raw Data (Part 1: Identifiers & Metrics)</h2>
+            <p>Below are the first 9 columns of the original dataset. These contain the core numerical data.</p>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>title</th>
+                            <th>channel_name</th>
+                            <th>daily_rank</th>
+                            <th>daily_movement</th>
+                            <th>weekly_movement</th>
+                            <th>snapshot_date</th>
+                            <th>country</th>
+                            <th>view_count</th>
+                            <th>like_count</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Jnr Spragga - Tinodanana...</td>
+                            <td>Jnr Spragga</td>
+                            <td>1</td>
+                            <td>0</td>
+                            <td>0</td>
+                            <td>2026-02-10</td>
+                            <td>ZW</td>
+                            <td>263327</td>
+                            <td>13860</td>
+                        </tr>
+                        <tr>
+                            <td>WAR MACHINE | Official...</td>
+                            <td>Netflix</td>
+                            <td>2</td>
+                            <td>0</td>
+                            <td>48</td>
+                            <td>2026-02-10</td>
+                            <td>ZW</td>
+                            <td>11605061</td>
+                            <td>180480</td>
+                        </tr>
+                        <tr>
+                            <td>Minecraft Pro VS 1000...</td>
+                            <td>Wemmbu</td>
+                            <td>3</td>
+                            <td>0</td>
+                            <td>47</td>
+                            <td>2026-02-10</td>
+                            <td>ZW</td>
+                            <td>4243816</td>
+                            <td>225413</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 5. Raw Data Part 2 -->
+        <div class="slide">
+            <h2>The Raw Data (Part 2: The "Problem" Columns)</h2>
+            <p>Here are the remaining 9 columns. Note the massive text blocks in <code>description</code> and <code>video_tags</code>.</p>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>comment_count</th>
+                            <th>description</th>
+                            <th>thumbnail_url</th>
+                            <th>video_id</th>
+                            <th>channel_id</th>
+                            <th>video_tags</th>
+                            <th>kind</th>
+                            <th>publish_date</th>
+                            <th>langauge</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>1341</td>
+                            <td class="cell-long-text">Jnr Spragga official music video - TINODANANA Connect with...</td>
+                            <td>https://i.ytimg.com...</td>
+                            <td>XHm5P8ftt7Q</td>
+                            <td>UCnd7uA3...</td>
+                            <td>btwbc,jnrspragga...</td>
+                            <td>youtube#video</td>
+                            <td>2026-02-01...</td>
+                            <td>und</td>
+                        </tr>
+                        <tr>
+                            <td>14759</td>
+                            <td class="cell-long-text">During the final stage of U.S. Army Ranger selection...</td>
+                            <td>https://i.ytimg.com...</td>
+                            <td>AFuE1LRxm80</td>
+                            <td>UCWOA1ZGy...</td>
+                            <td>Alan Ritchson, War...</td>
+                            <td>youtube#video</td>
+                            <td>2026-02-04...</td>
+                            <td>en-US</td>
+                        </tr>
+                        <tr>
+                            <td>26453</td>
+                            <td class="cell-long-text">massive minecraft war Minecraft Pro VS 1000 Players...</td>
+                            <td>https://i.ytimg.com...</td>
+                            <td>CLm57ZHTJvQ</td>
+                            <td>UCFCKUxe...</td>
+                            <td>minecraft,pvp,smp...</td>
+                            <td>youtube#video</td>
+                            <td>2026-02-07...</td>
+                            <td>en-US</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <p style="margin-top: 1rem; color: var(--danger); font-size: 0.9rem;">* These text columns caused file bloat (5GB) and performance issues.</p>
+        </div>
+
+        <!-- 6. Key Variables -->
+        <div class="slide">
+            <h2>Key Variables Retained</h2>
+            <p>To optimize for analytics, we retained only performance-based columns.</p>
+            <div class="grid-2">
+                <div class="card">
+                    <h3>Metrics (Quantitative)</h3>
+                    <ul>
+                        <li><code>view_count</code></li>
+                        <li><code>like_count</code></li>
+                        <li><code>comment_count</code></li>
+                        <li><code>daily_rank</code></li>
+                        <li><code>daily_movement</code></li>
+                    </ul>
+                </div>
+                <div class="card">
+                    <h3>Dimensions (Qualitative)</h3>
+                    <ul>
+                        <li><code>video_id</code></li>
+                        <li><code>channel_name</code></li>
+                        <li><code>country</code> (ISO-2)</li>
+                        <li><code>publish_date</code></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- 7. Cleaning Strategy Overview -->
+        <div class="slide">
+            <h2>Task 2: Cleaning Strategy</h2>
+            <div class="grid-2">
+                <div>
+                    <p>Our goal was to transform the 5GB raw file into a high-performance dataset.</p>
+                    <h3 style="margin-top: 2rem;">Phases</h3>
+                    <ol>
+                        <li><strong>Architectural Optimization:</strong> Dimensionality Reduction.</li>
+                        <li><strong>Quality Assurance:</strong> Missing values & Types.</li>
+                        <li><strong>Geospatial:</strong> Regex Extraction.</li>
+                        <li><strong>Feature Engineering:</strong> Rates & Outliers.</li>
+                    </ol>
+                </div>
+                <div class="card">
+                    <h3>Result</h3>
+                    <p>Reduced file size to <strong>98.9MB</strong> while retaining 100% of statistical observations.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 8. Phase 1: Optimization -->
+        <div class="slide">
+            <h2>Phase 1: Architectural Optimization</h2>
+            <div class="grid-2">
+                <div>
+                    <h3>Theory</h3>
+                    <p>The raw dataset contained heavy unstructured text fields that were irrelevant to numerical analytics.</p>
+                    <p><strong>Action:</strong> We dropped <code>kind</code>, <code>title</code>, <code>video_tags</code>, <code>thumbnail_url</code>, and <code>description</code>.</p>
+                </div>
+                <div class="card">
+                    <h3>Methodology</h3>
+                    <p>We used <strong>Stream Processing</strong> (Chunking) to read the file in blocks of 100,000 rows. This avoided loading the entire 5GB into RAM.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 9. Code: Optimization -->
+        <div class="slide">
+            <h2>Code: Stream Processing</h2>
+            <div class="code-header">remove_columns.py</div>
+            <pre><code><span class="keyword">def</span> <span class="func">drop_columns_stream</span>(input_path, chunksize=<span class="num">100_000</span>):
+    TO_DROP = {<span class="str">"kind"</span>, <span class="str">"title"</span>, <span class="str">"video_tags"</span>, 
+               <span class="str">"thumbnail_url"</span>, <span class="str">"description"</span>}
+
+    <span class="keyword">with</span> open(input_path, <span class="str">"r"</span>) <span class="keyword">as</span> fh:
+        <span class="comment"># Process in chunks to prevent MemoryError</span>
+        <span class="keyword">for</span> chunk <span class="keyword">in</span> pd.read_csv(fh, chunksize=chunksize):
+            
+            <span class="comment"># Drop columns if they exist</span>
+            drop_here = [c <span class="keyword">for</span> c <span class="keyword">in</span> TO_DROP <span class="keyword">if</span> c <span class="keyword">in</span> chunk.columns]
+            chunk = chunk.drop(columns=drop_here)
+            
+            <span class="comment"># Write to new CSV</span>
+            chunk.to_csv(out_path, mode=<span class="str">"a"</span>)</code></pre>
+        </div>
+
+        <!-- 10. Phase 2: QA -->
+        <div class="slide">
+            <h2>Phase 2: Data Quality Assurance</h2>
+            <div class="grid-2">
+                <div>
+                    <h3>Missing Values</h3>
+                    <p>We identified nulls in critical metric columns (<code>view_count</code>, <code>like_count</code>).</p>
+                    <p><strong>Decision:</strong> Drop rows. Records without these variables cannot be used for regression analysis.</p>
+                </div>
+                <div>
+                    <h3>Data Typing</h3>
+                    <p>Converted <code>publish_date</code> to DateTime objects for time-series analysis.</p>
+                    <p>Validated <code>country</code> codes (e.g., 'ZW', 'US') for geospatial mapping.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 11. Phase 3: Geocoding Theory -->
+        <div class="slide">
+            <h2>Phase 3: Geospatial Extraction</h2>
+            <p>Tableau maps require clean ISO-2 codes. The raw data contained mixed formats.</p>
+            <div class="card" style="margin-top: 2rem;">
+                <h3>Regex Strategy</h3>
+                <p>We used Regular Expressions to find 2-letter uppercase patterns (e.g., <code>[A-Z]{2}</code>) to extract clean country codes for every row.</p>
+            </div>
+        </div>
+
+        <!-- 12. Code: Regex -->
+        <div class="slide">
+            <h2>Code: Regex Extraction</h2>
+            <div class="code-header">extract_unique_countries_arr.py</div>
+            <pre><code><span class="keyword">import</span> re
+
+<span class="keyword">def</span> <span class="func">find_best_column</span>(df):
+    <span class="comment"># Regex for 2-letter codes</span>
+    two_letter_re = re.compile(<span class="str">r'\b([A-Za-z]{2})\b'</span>)
+    
+    unique_codes = []
+    
+    <span class="keyword">for</span> cell <span class="keyword">in</span> df[col]:
+        matches = two_letter_re.findall(str(cell))
+        <span class="keyword">if</span> matches:
+            unique_codes.append(matches[<span class="num">0</span>].upper())
+            
+    <span class="keyword">print</span>(unique_codes) 
+    <span class="comment"># Result: ['ZW', 'ZA', 'US', 'GB'...]</span></code></pre>
+        </div>
+
+        <!-- 13. Phase 4: Feature Engineering Theory -->
+        <div class="slide">
+            <h2>Phase 4: Feature Engineering</h2>
+            <div class="grid-2">
+                <div>
+                    <h3>Standardization</h3>
+                    <p>Comparing raw counts is unfair (Big Channel vs. Small Channel). We engineered <strong>Rates</strong> to measure efficiency.</p>
+                </div>
+                <div class="card">
+                    <h3>New Metrics</h3>
+                    <ul>
+                        <li><strong>Engagement Rate:</strong> (Likes + Comments) / Views</li>
+                        <li><strong>Like Ratio:</strong> Likes / Views</li>
+                        <li><strong>Comment Ratio:</strong> Comments / Views</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- 14. Code: Feature Engineering -->
+        <div class="slide">
+            <h2>Code: Calculating Rates</h2>
+            <div class="code-header">stats_columns_addition.py (Part 1)</div>
+            <pre><code><span class="comment"># 1. Avoid Division by Zero</span>
+df[<span class="str">'view_count'</span>] = df[<span class="str">'view_count'</span>].replace(<span class="num">0</span>, <span class="num">1</span>)
+
+<span class="comment"># 2. Calculate Engagement Rate</span>
+df[<span class="str">'engagement_rate'</span>] = (
+    (df[<span class="str">'like_count'</span>] + df[<span class="str">'comment_count'</span>]) / 
+    df[<span class="str">'view_count'</span>]
+).round(<span class="num">4</span>)
+
+<span class="comment"># 3. Calculate Like Ratio</span>
+df[<span class="str">'like_ratio'</span>] = (
+    df[<span class="str">'like_count'</span>] / df[<span class="str">'view_count'</span>]
+).round(<span class="num">4</span>)</code></pre>
+        </div>
+
+        <!-- 15. Phase 5: Outlier Theory -->
+        <div class="slide">
+            <h2>Phase 5: Outlier Handling</h2>
+            <div class="grid-2">
+                <div>
+                    <h3>The Viral Anomaly</h3>
+                    <p>"Viral" videos are statistical outliers. Removing them destroys the analysis.</p>
+                    <p><strong>Strategy:</strong> We used the Interquartile Range (IQR) method to <strong>Flag</strong> them instead of deleting them.</p>
+                </div>
+                <div class="card">
+                    <h3>The Flag</h3>
+                    <p><code>is_view_outlier</code> (Boolean)</p>
+                    <p>Allows Tableau users to toggle between "Normal Trends" and "Viral Anomalies".</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 16. Code: Outlier Flag -->
+        <div class="slide">
+            <h2>Code: Outlier Flagging</h2>
+            <div class="code-header">stats_columns_addition.py (Part 2)</div>
+            <pre><code><span class="keyword">print</span>(<span class="str">"Identifying Outliers..."</span>)
+
+Q1 = df[<span class="str">'view_count'</span>].quantile(<span class="num">0.25</span>)
+Q3 = df[<span class="str">'view_count'</span>].quantile(<span class="num">0.75</span>)
+IQR = Q3 - Q1
+
+<span class="comment"># Dynamic Upper Bound</span>
+upper = Q3 + <span class="num">1.5</span> * IQR
+
+<span class="comment"># Create Flag Column</span>
+df[<span class="str">'is_view_outlier'</span>] = np.where(
+    (df[<span class="str">'view_count'</span>] > upper), 
+    <span class="keyword">True</span>, 
+    <span class="keyword">False</span>
+)</code></pre>
+        </div>
+
+        <!-- 17. Final Dataset Overview -->
+        <div class="slide">
+            <h2>Final Dataset Overview</h2>
+            <div class="grid-2">
+                <div>
+                    <h3>Specs</h3>
+                    <ul>
+                        <li><strong>Rows:</strong> 1048576 rows of data</li>
+                        <li><strong>File Name:</strong> <code>final_tableau_dataset.csv</code></li>
+                        <li><strong>Size:</strong> ~98 MB</li>
+                    </ul>
+                </div>
+                <div class="card">
+                    <h3>Readiness</h3>
+                    <p>The dataset is now optimized for import into Tableau with all necessary dimensions, metrics, and engineered features.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 18. Cleaned Data Part 1 -->
+        <div class="slide">
+            <h2>The Cleaned Result (Part 1: Metrics)</h2>
+            <p>Below are the first 7 columns of the final processed file. Note the clean numerical data.</p>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>channel_name</th>
+                            <th>daily_rank</th>
+                            <th>daily_movement</th>
+                            <th>weekly_movement</th>
+                            <th>country</th>
+                            <th>view_count</th>
+                            <th>like_count</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>Jnr Spragga</td><td>1</td><td>0</td><td>0</td><td>ZW</td><td>263327</td><td>13860</td></tr>
+                        <tr><td>Netflix</td><td>2</td><td>0</td><td>48</td><td>ZW</td><td>11605061</td><td>180480</td></tr>
+                        <tr><td>Wemmbu</td><td>3</td><td>0</td><td>47</td><td>ZW</td><td>4243816</td><td>225413</td></tr>
+                        <tr><td>Josh Mtima - Topic</td><td>4</td><td>0</td><td>3</td><td>ZW</td><td>285889</td><td>4775</td></tr>
+                        <tr><td>HBO Max</td><td>5</td><td>3</td><td>45</td><td>ZW</td><td>5598191</td><td>117082</td></tr>
+                        <tr><td>AFIZA FOOTBALL LIVE</td><td>6</td><td>0</td><td>44</td><td>ZW</td><td>90464</td><td>317</td></tr>
+                        <tr><td>Oriyano Official</td><td>7</td><td>0</td><td>10</td><td>ZW</td><td>214033</td><td>6730</td></tr>
+                        <tr><td>Prime Video</td><td>8</td><td>3</td><td>-3</td><td>ZW</td><td>3935154</td><td>205914</td></tr>
+                        <tr><td>十Loork Football</td><td>9</td><td>0</td><td>41</td><td>ZW</td><td>154240</td><td>668</td></tr>
+                        <tr><td>Master H</td><td>10</td><td>0</td><td>40</td><td>ZW</td><td>240466</td><td>11507</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 19. Cleaned Data Part 2 -->
+        <div class="slide">
+            <h2>The Cleaned Result (Part 2: Engineered Features)</h2>
+            <p>Here are the remaining 8 columns, including our calculated Rates and Outlier Flags.</p>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>comment_count</th>
+                            <th>video_id</th>
+                            <th>publish_date</th>
+                            <th>langauge</th>
+                            <th style="color:var(--success)">engagement_rate</th>
+                            <th style="color:var(--success)">like_ratio</th>
+                            <th style="color:var(--success)">comment_ratio</th>
+                            <th style="color:var(--accent)">is_view_outlier</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>1341</td><td>XHm5P8ftt7Q</td><td>2/1/2026</td><td>und</td><td>0.0577</td><td>0.0526</td><td>0.0051</td><td>FALSE</td></tr>
+                        <tr><td>14759</td><td>AFuE1LRxm80</td><td>2/4/2026</td><td>en-US</td><td>0.0168</td><td>0.0156</td><td>0.0013</td><td>FALSE</td></tr>
+                        <tr><td>26453</td><td>CLm57ZHTJvQ</td><td>2/7/2026</td><td>en-US</td><td>0.0593</td><td>0.0531</td><td>0.0062</td><td>FALSE</td></tr>
+                        <tr><td>0</td><td>mkRqOY1Y8tw</td><td>1/31/2026</td><td>en</td><td>0.0167</td><td>0.0167</td><td>0</td><td>FALSE</td></tr>
+                        <tr><td>7980</td><td>-1UJJPAWudQ</td><td>1/14/2026</td><td>en</td><td>0.0223</td><td>0.0209</td><td>0.0014</td><td>FALSE</td></tr>
+                        <tr><td>1</td><td>3Fi--IcTdx0</td><td>2/8/2026</td><td>en</td><td>0.0035</td><td>0.0035</td><td>0</td><td>FALSE</td></tr>
+                        <tr><td>546</td><td>wb1GD_c8tlI</td><td>2/2/2026</td><td>en-GB</td><td>0.034</td><td>0.0314</td><td>0.0026</td><td>FALSE</td></tr>
+                        <tr><td>10536</td><td>ZnfUeVeMKjY</td><td>1/22/2026</td><td>en</td><td>0.055</td><td>0.0523</td><td>0.0027</td><td>FALSE</td></tr>
+                        <tr><td>1</td><td>BRih8nQXKEI</td><td>2/8/2026</td><td>en</td><td>0.0043</td><td>0.0043</td><td>0</td><td>FALSE</td></tr>
+                        <tr><td>1105</td><td>TIG5IzusQ24</td><td>2/6/2026</td><td>en</td><td>0.0524</td><td>0.0479</td><td>0.0046</td><td>FALSE</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- TRANSITION 1: Global Views & Language Dominance Analytics -->
+        <div class="slide">
+            <div class="transition-container">
+                <div class="transition-label">Section I</div>
+                <h1 class="transition-title">Global Views &<br>Language Dominance Analytics</h1>
+            </div>
+        </div>
+
+        <!-- 20. Dashboard 1 Key Visualizations (Teammate 1) -->
+        <div class="slide">
+            <h2>Key Visualizations: Language & Channel Dominance</h2>
+            <div class="grid-2">
+                <div>
+                    <h3>Language View Share</h3>
+                    <p>Based on the pie chart analysis of regional and primary languages:</p>
+                    <ul>
+                        <li><strong>English Dominance:</strong> Commands the platform with <span style="color: var(--primary); font-weight: bold;">42.8%</span> of the total view count (over 755B views).</li>
+                        <li><strong>Top Competitors:</strong> Korean takes second place at 17.5%, followed closely by Hindi at 7.9%.</li>
+                    </ul>
+                </div>
+                <div class="card" style="border-left: 4px solid var(--accent);">
+                    <h3>The Top Channels Paradox</h3>
+                    <p>Despite English having the highest overall view share, the bar chart reveals a concentration of power elsewhere:</p>
+                    <ul>
+                        <li><strong>The Korean Powerhouse:</strong> The top two channels globally are Korean (JYP Entertainment & BABYMONSTER).</li>
+                        <li><strong>English Lags at Top:</strong> The first English channel (MrBeast Gaming) appears only in 3rd place.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- 21. Dashboard 1 Key Visualizations (Teammate 1) -->
+        <div class="slide">
+            <h2>Key Visualizations: Geographic & Temporal Demand</h2>
+            <div class="grid-2">
+                <div>
+                    <h3>Geographic Anomalies</h3>
+                    <p>Analyzing the top 50 trending videos by country reveals unexpected consumption leaders:</p>
+                    <ul>
+                        <li><strong>Highest View Counts:</strong> New Zealand, Bahrain, and Oman dominate the viewership volume.</li>
+                        <li><strong>The Disconnect:</strong> These consuming geographies differ drastically from the top-producing languages, highlighting massive international cross-border appeal.</li>
+                    </ul>
+                </div>
+                <div class="card" style="border-left: 4px solid var(--success);">
+                    <h3>Temporal Trend Analysis</h3>
+                    <p>Weekly tracking (June 2025 - Feb 2026) shows distinct seasonal demand:</p>
+                    <ul>
+                        <li><strong>The October Spike:</strong> A massive, nearly symmetric peak occurred around <strong>October 5, 2025</strong> (~169.5B views).</li>
+                        <li><strong>Implication:</strong> High concentration of seasonal demand, likely tied to major global media events or coordinated release windows.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- TRANSITION 2: Engagement Performance & Momentum Analytics -->
+        <div class="slide">
+            <div class="transition-container">
+                <div class="transition-label">Section II</div>
+                <h1 class="transition-title">Engagement Performance &<br>Momentum Analytics</h1>
+            </div>
+        </div>
+
+        <!-- 22. Dashboard 2 Key Visualizations (Teammate 2) - Part 1 -->
+        <div class="slide">
+            <h2>Key Visualizations: Engagement Dynamics & Inequality</h2>
+            <div class="grid-2">
+                <div>
+                    <h3>The View Volume Paradox</h3>
+                    <p>Based on our View Volume and Engagement Rate scatter plot:</p>
+                    <ul>
+                        <li><strong>The Inverse Relationship:</strong> Higher view volumes tend to correspond with proportionally <em>lower</em> engagement rates.</li>
+                        <li><strong>Viral Dilution:</strong> Massive reach (views) does not guarantee interaction (likes/comments); in fact, scale actively dilutes engagement concentration.</li>
+                    </ul>
+                </div>
+                <div class="card" style="border-left: 4px solid var(--danger);">
+                    <h3>Performance Inequality</h3>
+                    <p>Our Histogram of Engagement Distribution reveals stark disparities:</p>
+                    <ul>
+                        <li><strong>Severe Right-Skew:</strong> The vast majority of platform content clusters at the absolute lowest engagement levels (0% to ~2.2%).</li>
+                        <li><strong>The 1% Creators:</strong> Very few videos break out to achieve high engagement, demonstrating strong performance inequality across the ecosystem.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- 23. Dashboard 2 Key Visualizations (Teammate 2) - Part 2 -->
+        <div class="slide">
+            <h2>Key Visualizations: Creator Quality & Geographic Momentum</h2>
+            <div class="grid-2">
+                <div>
+                    <h3>Scale-Adjusted Channel Quality</h3>
+                    <p>Using our dynamic Top Channels parameter ranking:</p>
+                    <ul>
+                        <li><strong>Beyond Vanity Metrics:</strong> By controlling for view scale, we isolate pure "Engagement Quality Scores."</li>
+                        <li><strong>Uneven Playing Field:</strong> Channel performance varies wildly. Top creators (like <em>SoleyGJVEVO</em> or <em>MC RN DO CAPÃO</em>) significantly outperform their peers in driving actual interactions per view.</li>
+                    </ul>
+                </div>
+                <div class="card" style="border-left: 4px solid var(--accent);">
+                    <h3>Global Behavioral Variance</h3>
+                    <p>Combining our Momentum Map and Country Boxplots:</p>
+                    <ul>
+                        <li><strong>Geographic Momentum:</strong> Engagement strength and performance growth are heavily concentrated in specific regions (e.g., North America and parts of South America/Russia).</li>
+                        <li><strong>Regional Outliers:</strong> Country-level distributions show extreme high-end outliers and high variability (e.g., BR, EG), proving user interaction behaviors are deeply tied to regional culture.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- NEW PILLAR: BUSINESS INSIGHTS & STRATEGIES -->
+        <!-- ========================================== -->
+
+        <!-- TRANSITION 3: Business Insights & Recommendations -->
+        <div class="slide">
+            <div class="transition-container">
+                <div class="transition-label">Section III</div>
+                <h1 class="transition-title">Business Insights &<br>Strategic Recommendations</h1>
+            </div>
+        </div>
+
+        <!-- 24. Executive Summary -->
+        <div class="slide">
+            <h2>Executive Summary of Findings</h2>
+            <div class="grid-2">
+                <div>
+                    <p>Following the rigorous data preparation and visualization in Tableau, our analysis of the Global YouTube Trends dataset reveals a critical narrative:</p>
+                    
+                    <h3 style="color: var(--danger); font-size: 2.2rem; margin: 2rem 0;">Reach does not equal resonance.</h3>
+                    
+                    <p>While raw view counts capture market share, the quality of audience interaction (engagement) behaves entirely differently.</p>
+                </div>
+                <div class="card" style="border-left: 4px solid var(--primary);">
+                    <h3>The Deliverable</h3>
+                    <p>This final pillar of our report outlines actionable takeaways for optimizing digital platform performance:</p>
+                    <ul>
+                        <li><strong>Four Key Insights:</strong> The core behaviors uncovered by our data and dashboards.</li>
+                        <li><strong>Five Strategic Pillars:</strong> Concrete recommendations for brands, marketers, and creators to maximize growth.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- 25. Business Insights Part 1 -->
+        <div class="slide">
+            <h2>Key Business Insights (1/2)</h2>
+            <div class="grid-2">
+                <div class="card" style="border-left: 4px solid var(--danger);">
+                    <h3>1. The "Viral Dilution" Effect</h3>
+                    <p style="color: var(--primary); font-weight: bold; margin-bottom: 1rem;">Engagement Decreases with Scale</p>
+                    <ul>
+                        <li><strong>The Inverse Relationship:</strong> As demonstrated by our scatter plot analysis, there is a clear inverse relationship between view volume and engagement rates.</li>
+                        <li><strong>The Phenomenon:</strong> Videos that achieve massive, viral reach tend to suffer from "diluted" audience interaction. Higher views reliably correspond to lower engagement rates.</li>
+                        <li><strong>Takeaway:</strong> Viral reach guarantees eyeballs, but it does <em>not</em> guarantee active interaction like likes or comments.</li>
+                    </ul>
+                </div>
+                <div class="card" style="border-left: 4px solid var(--accent);">
+                    <h3>2. Engagement is Highly Concentrated</h3>
+                    <p style="color: var(--primary); font-weight: bold; margin-bottom: 1rem;">The 1% Rule</p>
+                    <ul>
+                        <li><strong>Severe Inequality:</strong> Our histogram distribution proves extreme performance inequality across the entire platform.</li>
+                        <li><strong>The Bottom 99%:</strong> The vast majority of videos fall into the absolute lowest engagement ranges (0% to 2.2%).</li>
+                        <li><strong>The Breakouts:</strong> Only a fractional percentage of videos manage to break out and achieve strong, concentrated audience engagement.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- 26. Business Insights Part 2 -->
+        <div class="slide">
+            <h2>Key Business Insights (2/2)</h2>
+            <div class="grid-2">
+                <div class="card" style="border-left: 4px solid var(--success);">
+                    <h3>3. Scale-Adjusted Leaders Exist</h3>
+                    <p style="color: var(--primary); font-weight: bold; margin-bottom: 1rem;">Neutralizing Big Channel Bias</p>
+                    <ul>
+                        <li><strong>A New Tier of Creators:</strong> When we neutralize the "big channel bias" using our engineered engagement metrics, new leaders emerge.</li>
+                        <li><strong>Engagement Quality:</strong> Certain channels consistently outperform the market average in pure engagement quality, regardless of their total subscriber or view counts.</li>
+                        <li><strong>Takeaway:</strong> Creator quality and community loyalty vary significantly across the ecosystem.</li>
+                    </ul>
+                </div>
+                <div class="card" style="border-left: 4px solid var(--primary);">
+                    <h3>4. Geographic & Temporal Differences Matter</h3>
+                    <p style="color: var(--accent); font-weight: bold; margin-bottom: 1rem;">Engagement is not a monolith</p>
+                    <ul>
+                        <li><strong>Regional Variance:</strong> Our geospatial mapping and country-level boxplots reveal that engagement levels vary drastically by region.</li>
+                        <li><strong>Concentrated Pockets:</strong> Momentum is heavily concentrated in specific regional pockets.</li>
+                        <li><strong>Takeaway:</strong> This proves that cultural consumption habits directly dictate user interaction rates.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- 27. Strategic Recommendations Part 1 -->
+        <div class="slide">
+            <h2>Strategic Recommendations (1/2)</h2>
+            <div class="grid-2">
+                <div>
+                    <h3>I. Shift Focus Beyond Views</h3>
+                    <p>Brands and marketers must fundamentally stop optimizing solely for reach.</p>
+                    <ul>
+                        <li><strong>Re-align KPIs:</strong> Success metrics must be re-aligned to prioritize <em>engagement quality</em>.</li>
+                        <li><strong>Active Conversion:</strong> Strengthen internal Content Calls-to-Action (CTAs) to actively convert passive viewers into participating users.</li>
+                    </ul>
+                </div>
+                <div class="card" style="border-left: 4px solid var(--success);">
+                    <h3>II. Scale What Already Works</h3>
+                    <p style="color: var(--primary); font-weight: bold; margin-bottom: 1rem;">>5% Threshold Strategy</p>
+                    <ul>
+                        <li><strong>Action:</strong> Identify the specific, rare videos surpassing a strong engagement threshold (e.g., >5%).</li>
+                        <li><strong>Analyze:</strong> Evaluate their format, tone, pacing, and structure.</li>
+                        <li><strong>Goal:</strong> Reverse-engineer these anomalies and replicate those formats to turn accidental engagement success into a repeatable content strategy.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- 28. Strategic Recommendations Part 2 -->
+        <div class="slide">
+            <h2>Strategic Recommendations (2/2)</h2>
+            <div class="grid-2">
+                <div class="card" style="border-left: 4px solid var(--accent);">
+                    <h3>III. Partner with High-Quality Channels</h3>
+                    <p>Shift influencer and partnership budgets away from pure "vanity metrics" like raw subscribers or views.</p>
+                    <ul>
+                        <li><strong>Data-Driven Collabs:</strong> Collaborate instead with creators who rank highest in our <em>Scale-Adjusted Engagement Quality</em> metric.</li>
+                        <li><strong>Benchmarking:</strong> Use these high-performing channels as standard benchmarks for your own internal content.</li>
+                    </ul>
+                </div>
+                <div>
+                    <h3>IV. Hyper-Localize Strategy</h3>
+                    <p>Standardized global content fails to maximize engagement across the board.</p>
+                    <ul>
+                        <li><strong>Invest in Momentum:</strong> Invest heavily in the high-momentum regions identified in the geographic analysis.</li>
+                        <li><strong>Cultural Adaptation:</strong> Content must be culturally adapted and localized to match specific regional audience behaviors.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- 29. Strategic Conclusion -->
+        <div class="slide">
+            <div style="text-align: center; max-width: 900px; margin: 0 auto;">
+                <h2 style="border: none; font-size: 2.5rem; justify-content: center; display: flex; color: var(--text-main); margin-bottom: 1rem;">V. Strategic Conclusion</h2>
+                
+                <div class="card" style="margin-top: 3rem; background: linear-gradient(135deg, rgba(59,130,246,0.1) 0%, rgba(167,139,250,0.1) 100%); border: 1px solid rgba(167,139,250,0.3); padding: 3rem;">
+                    <p style="font-size: 1.5rem; color: var(--text-main); line-height: 1.8; font-weight: 300; margin: 0;">
+                        Sustainable platform growth requires balancing massive reach with <strong style="color: var(--success);">high-quality engagement</strong>, leveraging unique <strong style="color: var(--primary);">regional strengths</strong>, and scientifically <strong style="color: var(--accent);">replicating proven, high-performing content patterns</strong>.
+                    </p>
+                </div>
+                
+                <p style="margin-top: 5rem; color: var(--text-muted); font-size: 1.1rem; letter-spacing: 3px; text-transform: uppercase;">
+                    End of Presentation
+                </p>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- BUTTONS WITH IDS FOR JS SELECTION -->
+    <div class="controls">
+        <button class="btn" id="btnPrev">← Prev</button>
+        <button class="btn" id="btnNext">Next →</button>
+    </div>
+
+    <script>
+        // Run safely when DOM is fully loaded
+        document.addEventListener('DOMContentLoaded', () => {
+            const slides = document.querySelectorAll('.slide');
+            const progressBar = document.getElementById('progress');
+            const btnPrev = document.getElementById('btnPrev');
+            const btnNext = document.getElementById('btnNext');
+            
+            let currentSlide = 0;
+
+            function updateSlide(index) {
+                // Ensure index is valid
+                if (index < 0) index = 0;
+                if (index >= slides.length) index = slides.length - 1;
+
+                slides.forEach((slide, i) => {
+                    slide.classList.remove('active');
+                    if (i === index) slide.classList.add('active');
+                });
+                
+                if (progressBar) {
+                    progressBar.style.width = ((index + 1) / slides.length) * 100 + '%';
+                }
+            }
+
+            function next() {
+                if (currentSlide < slides.length - 1) {
+                    currentSlide++;
+                    updateSlide(currentSlide);
+                }
+            }
+
+            function prev() {
+                if (currentSlide > 0) {
+                    currentSlide--;
+                    updateSlide(currentSlide);
+                }
+            }
+
+            // Bind Events via Listeners (Safer than onclick)
+            if (btnNext) btnNext.addEventListener('click', next);
+            if (btnPrev) btnPrev.addEventListener('click', prev);
+
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'ArrowRight' || e.code === 'Space' || e.key === ' ') {
+                    e.preventDefault(); // Prevent scrolling on Space
+                    next();
+                }
+                if (e.key === 'ArrowLeft') {
+                    prev();
+                }
+                if (e.key === 'f') {
+                    if (!document.fullscreenElement) {
+                        document.documentElement.requestFullscreen().catch(e => console.log(e));
+                    } else {
+                        document.exitFullscreen().catch(e => console.log(e));
+                    }
+                }
+            });
+
+            // Initialize
+            updateSlide(0);
+        });
+    </script>
+</body>
+</html>
